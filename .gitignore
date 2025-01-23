@@ -1,0 +1,33 @@
+# Build artifacts and executables
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.o
+*.pdb
+
+# Go build cache
+go-build/
+
+# Dependency management tools
+## Dep
+vendor/
+Gopkg.lock
+Gopkg.toml
+## Go Modules
+go.sum
+# Uncomment the next line to ignore module files, but it's usually better to keep them versioned.
+# go.mod
+
+# IDE and editor settings
+*.iml
+*.idea
+.project
+.classpath
+.settings/
+.vscode/
+
+# OS generated files
+.DS_Store
+Thumbs.db
