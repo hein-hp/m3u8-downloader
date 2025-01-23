@@ -54,7 +54,7 @@ func Download(source M3U8, maxGoroutines int64, output string) {
 	}
 	wg.Wait()
 
-	// 统计下载数量
+	// 统计下载帧数量
 	files, err := countFiles(tempDir)
 	if err != nil {
 		log.Fatalf("统计文件失败: %v", err)
