@@ -44,11 +44,11 @@ func ParseFrame(body, host, baseUrlPrefix string) (frames []Frame) {
 	return frames
 }
 
-func MergeFrame(source M3U8, targetDir, fileName string) error {
+func MergeFrame(source M3U8, ctx *Context) error {
 	// 临时文件：targetDir/fileName.m3u8
-	temp := path.Join(targetDir, fileName+".m3u8")
+	temp := path.Join(ctx.dir, ctx.output+".m3u8")
 	// 目标文件：targetDir/fileName.mp4
-	target := path.Join(targetDir, fileName+".mp4")
+	target := path.Join(ctx.dir, ctx.output+".mp4")
 
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -56,7 +56,7 @@ func MergeFrame(source M3U8, targetDir, fileName string) error {
 	}
 
 	// 临时文件夹：用户目录/.m3u8_temp/fileName
-	tempDir := filepath.Join(homeDir, ".m3u8_temp", fileName)
+	tempDir := filepath.Join(homeDir, ".m3u8_temp", ctx.output)
 
 	outFile, err := os.OpenFile(temp, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {

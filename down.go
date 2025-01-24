@@ -10,20 +10,20 @@ import (
 	"time"
 )
 
-func Download(source M3U8, maxGoroutines int64, output string) {
+func Download(source M3U8, ctx *Context) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		log.Fatalf("获取用户主目录失败: %v", err)
 	}
 
-	tempDir := filepath.Join(homeDir, ".m3u8_temp", output)
+	tempDir := filepath.Join(homeDir, ".m3u8_temp", ctx.output)
 	if err := os.MkdirAll(tempDir, 0755); err != nil {
 		log.Fatalf("创建临时目录失败: %v", err)
 	}
 
 	retry := 100
 	var wg sync.WaitGroup
-	limiter := make(chan struct{}, maxGoroutines)
+	limiter := make(chan struct{}, ctx.parallel)
 
 	// 添加进度统计
 	totalFiles := len(source.frames)
@@ -48,7 +48,7 @@ func Download(source M3U8, maxGoroutines int64, output string) {
 				wg.Done()
 				<-limiter
 			}()
-			doDown(frame, tempDir, source.encrypt, retry)
+			doDown(frame, tempDir, source.encrypt, ctx, retry)
 			_ = bar.Add(1)
 		}(frame, tempDir, retry)
 	}
@@ -66,7 +66,7 @@ func Download(source M3U8, maxGoroutines int64, output string) {
 	}
 }
 
-func doDown(frame Frame, dir string, encrypt Encrypt, retry int) {
+func doDown(frame Frame, dir string, encrypt Encrypt, ctx *Context, retry int) {
 	if retry < 0 {
 		log.Printf("当前文件 %s 下载失败", frame.Url)
 		return
@@ -75,14 +75,18 @@ func doDown(frame Frame, dir string, encrypt Encrypt, retry int) {
 	if isExist, _ := pathExists(current); isExist {
 		return
 	}
-	// TODO 加 User-Agent、Refer等
 	resp, err := HttpGet(&HttpRequestConfig{
 		URL: frame.Url,
+		Headers: map[string]string{
+			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+			"Referer":    ctx.referer,
+			"Cookie":     ctx.cookie,
+		},
 	})
 	if err != nil {
 		if retry > 0 {
 			time.Sleep(500 * time.Millisecond) // 休眠，防止频繁请求
-			doDown(frame, dir, encrypt, retry-1)
+			doDown(frame, dir, encrypt, ctx, retry-1)
 			return
 		} else {
 			log.Printf("文件 %s 下载失败: %v", frame.Name, err)
@@ -95,7 +99,7 @@ func doDown(frame Frame, dir string, encrypt Encrypt, retry int) {
 		if err != nil {
 			log.Printf("解密失败: %v", err)
 			time.Sleep(500 * time.Millisecond) // 休眠，防止频繁请求
-			doDown(frame, dir, encrypt, retry-1)
+			doDown(frame, dir, encrypt, ctx, retry-1)
 			return
 		}
 		syncByte := uint8(71) // 0x47
@@ -110,7 +114,7 @@ func doDown(frame Frame, dir string, encrypt Encrypt, retry int) {
 		if err != nil {
 			log.Printf("写入文件失败: %v", err)
 			time.Sleep(500 * time.Millisecond) // 休眠，防止频繁请求
-			doDown(frame, dir, encrypt, retry-1)
+			doDown(frame, dir, encrypt, ctx, retry-1)
 			return
 		}
 	} else {
@@ -118,7 +122,7 @@ func doDown(frame Frame, dir string, encrypt Encrypt, retry int) {
 		if err != nil {
 			log.Printf("写入文件失败: %v", err)
 			time.Sleep(500 * time.Millisecond) // 休眠，防止频繁请求
-			doDown(frame, dir, encrypt, retry-1)
+			doDown(frame, dir, encrypt, ctx, retry-1)
 			return
 		}
 	}

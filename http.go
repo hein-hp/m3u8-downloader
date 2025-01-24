@@ -26,7 +26,9 @@ func HttpGet(config *HttpRequestConfig) (string, error) {
 		return result, fmt.Errorf("error creating request: %w", err)
 	}
 	for key, value := range config.Headers {
-		req.Header.Set(key, value)
+		if value != "" {
+			req.Header.Set(key, value)
+		}
 	}
 	resp, err := client.Do(req)
 	if err != nil {
