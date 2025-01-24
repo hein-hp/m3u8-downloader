@@ -75,6 +75,7 @@ func doDown(frame Frame, dir string, encrypt Encrypt, retry int) {
 	if isExist, _ := pathExists(current); isExist {
 		return
 	}
+	// TODO 加 User-Agent、Refer等
 	resp, err := HttpGet(&HttpRequestConfig{
 		URL: frame.Url,
 	})
@@ -93,6 +94,7 @@ func doDown(frame Frame, dir string, encrypt Encrypt, retry int) {
 		data, err := AESDecrypt([]byte(resp), []byte(encrypt.key), encrypt.iv)
 		if err != nil {
 			log.Printf("解密失败: %v", err)
+			time.Sleep(500 * time.Millisecond) // 休眠，防止频繁请求
 			doDown(frame, dir, encrypt, retry-1)
 			return
 		}

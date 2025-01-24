@@ -11,7 +11,10 @@ import (
 
 func main() {
 
-	homeDir, _ := os.UserHomeDir()
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatalf("获取用户主目录失败: %v", err)
+	}
 	urlFlag := flag.String("l", "", "下载链接")
 	dirFlag := flag.String("d", homeDir, "目标目录")
 	outputFlag := flag.String("o", "output", "输出名称")
@@ -25,6 +28,7 @@ func main() {
 	}
 
 	// 下载 M3U8 文件
+	// TODO 添加User-Agent、Referer等
 	body, err := HttpGet(&HttpRequestConfig{
 		URL: *urlFlag,
 	})

@@ -9,14 +9,14 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 // ParseFrame 解析帧方法
 // 需要从m3u8文件中，找出每一帧实际的ts文件，这里复杂的地方在于很多网站都对ts文件进行了伪装
 // 比如伪装为png,jepg,jpg文件，再比如拿到的是一个请求路径，需要再次请求才能获取资源
 func ParseFrame(body, host, baseUrlPrefix string) (frames []Frame) {
-	for _, v := range strings.Split(body, "\n") {
+	lines := strings.Split(body, "\n")
+	for _, v := range lines {
 		if strings.HasPrefix(v, "#") || strings.TrimSpace(v) == "" {
 			continue
 		}
@@ -82,9 +82,6 @@ func MergeFrame(source M3U8, targetDir, fileName string) error {
 		return fmt.Errorf("转换MP4失败: %v", err)
 	}
 
-	// 等待一小段时间确保文件句柄被释放
-	time.Sleep(1 * time.Second)
-
 	// 清除临时文件
 	cleanTempFiles(tempDir, temp)
 
@@ -92,19 +89,15 @@ func MergeFrame(source M3U8, targetDir, fileName string) error {
 }
 
 func cleanTempFiles(tempDir, temp string) {
-	retry := func(action func() error) error {
-		maxRetries := 10
-		for i := 0; i < maxRetries; i++ {
-			if err := action(); err == nil {
-				return nil
-			}
-			time.Sleep(time.Second * time.Duration(i+1)) // 指数退避
-		}
-		return fmt.Errorf("删除失败，已达到最大重试次数")
-	}
 	// 清理临时目录和m3u8文件
-	_ = retry(func() error { return os.RemoveAll(tempDir) })
-	_ = retry(func() error { return os.Remove(temp) })
+	err := os.RemoveAll(tempDir)
+	if err != nil {
+		log.Fatalf("删除临时目录失败: %v", err)
+	}
+	err = os.Remove(temp)
+	if err != nil {
+		log.Fatalf("删除临时m3u8文件失败: %v", err)
+	}
 }
 
 // getFileNameFromUrl 从URL中获取文件名
@@ -114,8 +107,7 @@ func cleanTempFiles(tempDir, temp string) {
 // "relative/path/to/file.mp4",
 // "relative/path/to/file",
 // "/absolute/path/to/file.png",
-// "/absolute/path/to/file",
-// 最后结果都是file.ts
+// "/absolute/path/to/file", 最后结果都是file.ts
 func getFileNameFromUrl(input string) (string, error) {
 	parsed, err := url.Parse(input)
 	if err != nil {
