@@ -45,7 +45,7 @@ jobs:
 
       - name: Build binary
         run: |
-          GOOS=${GOOS} GOARCH=${GOARCH} go build  -o ./Releases/m3u8-${GOOS}-${GOARCH}${FILEEXTENSION} m3u8-downloader.go
+          GOOS=${GOOS} GOARCH=${GOARCH} go build  -o ./Releases/m3u8-${GOOS}-${GOARCH}${FILEEXTENSION} main.go
 
       - name: Release
         uses: softprops/action-gh-release@v2
