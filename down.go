@@ -73,7 +73,6 @@ func doDown(frame Frame, dir string, encrypt Encrypt, retry int) {
 	}
 	current := filepath.Join(dir, frame.Name)
 	if isExist, _ := pathExists(current); isExist {
-		log.Printf("文件 %s 已存在", frame.Name)
 		return
 	}
 	resp, err := HttpGet(&HttpRequestConfig{

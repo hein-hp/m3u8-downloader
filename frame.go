@@ -12,7 +12,10 @@ import (
 	"time"
 )
 
-func ParseFrame(body, baseUrlPrefix string) (frames []Frame) {
+// ParseFrame 解析帧方法
+// 需要从m3u8文件中，找出每一帧实际的ts文件，这里复杂的地方在于很多网站都对ts文件进行了伪装
+// 比如伪装为png,jepg,jpg文件，再比如拿到的是一个请求路径，需要再次请求才能获取资源
+func ParseFrame(body, host, baseUrlPrefix string) (frames []Frame) {
 	for _, v := range strings.Split(body, "\n") {
 		if strings.HasPrefix(v, "#") || strings.TrimSpace(v) == "" {
 			continue
@@ -21,9 +24,17 @@ func ParseFrame(body, baseUrlPrefix string) (frames []Frame) {
 		if err != nil {
 			log.Fatalf("无法解析文件名: %v", err)
 		}
-		toUrl := v
-		if !strings.HasPrefix(v, "http") {
-			toUrl = fmt.Sprintf("%s/%s", baseUrlPrefix, v)
+		toUrl := ""
+		switch isPathOrResource(v) {
+		case "resource":
+			toUrl = v
+			if !strings.HasPrefix(v, "http") {
+				toUrl = fmt.Sprintf("%s/%s", baseUrlPrefix, v)
+			}
+		case "path":
+			toUrl = fmt.Sprintf("https://%s/%s", host, v)
+		default:
+			log.Fatalf("无法识别的文件类型: %s", v)
 		}
 		frames = append(frames, Frame{
 			Name: name,
@@ -34,18 +45,22 @@ func ParseFrame(body, baseUrlPrefix string) (frames []Frame) {
 }
 
 func MergeFrame(source M3U8, targetDir, fileName string) error {
-	tempM3u8 := path.Join(targetDir, fileName+".m3u8")
-	targetMp4 := path.Join(targetDir, fileName+".mp4")
+	// 临时文件：targetDir/fileName.m3u8
+	temp := path.Join(targetDir, fileName+".m3u8")
+	// 目标文件：targetDir/fileName.mp4
+	target := path.Join(targetDir, fileName+".mp4")
 
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return err
 	}
+
+	// 临时文件夹：用户目录/.m3u8_temp/fileName
 	tempDir := filepath.Join(homeDir, ".m3u8_temp", fileName)
 
-	outFile, err := os.OpenFile(tempM3u8, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	outFile, err := os.OpenFile(temp, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
-		return fmt.Errorf("创建输出文件 %s 失败: %v", tempM3u8, err)
+		return fmt.Errorf("创建输出文件 %s 失败: %v", temp, err)
 	}
 	defer func() { _ = outFile.Close() }()
 
@@ -59,23 +74,24 @@ func MergeFrame(source M3U8, targetDir, fileName string) error {
 		if err != nil {
 			return fmt.Errorf("写入帧文件失败 %s: %v", framePath, err)
 		}
-		err = os.Remove(framePath)
-		if err != nil {
-			log.Printf("删除帧文件失败 %s: %v", framePath, err)
-		}
 	}
 
 	// 使用ffmpeg转换为mp4
-	cmd := exec.Command("ffmpeg", "-i", tempM3u8, "-c", "copy", targetMp4)
+	cmd := exec.Command("ffmpeg", "-i", temp, "-c", "copy", "-movflags", "+faststart", target)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("转换MP4失败: %v", err)
 	}
 
-	cleanTempFiles(tempDir, tempM3u8)
-	return err
+	// 等待一小段时间确保文件句柄被释放
+	time.Sleep(1 * time.Second)
+
+	// 清除临时文件
+	cleanTempFiles(tempDir, temp)
+
+	return nil
 }
 
-func cleanTempFiles(tempDir, tempM3u8 string) {
+func cleanTempFiles(tempDir, temp string) {
 	retry := func(action func() error) error {
 		maxRetries := 10
 		for i := 0; i < maxRetries; i++ {
@@ -88,9 +104,18 @@ func cleanTempFiles(tempDir, tempM3u8 string) {
 	}
 	// 清理临时目录和m3u8文件
 	_ = retry(func() error { return os.RemoveAll(tempDir) })
-	_ = retry(func() error { return os.Remove(tempM3u8) })
+	_ = retry(func() error { return os.Remove(temp) })
 }
 
+// getFileNameFromUrl 从URL中获取文件名
+// 获取规则是拿到url的最后一段，如果非.ts结尾，则替换为.ts
+// "http://example.com/path/to/file.js",
+// "http://example.com/path/to/file",
+// "relative/path/to/file.mp4",
+// "relative/path/to/file",
+// "/absolute/path/to/file.png",
+// "/absolute/path/to/file",
+// 最后结果都是file.ts
 func getFileNameFromUrl(input string) (string, error) {
 	parsed, err := url.Parse(input)
 	if err != nil {
@@ -113,4 +138,23 @@ func getFileNameFromUrl(input string) (string, error) {
 	}
 
 	return fileName, nil
+}
+
+// isPathOrResource 是请求路径还是资源路径
+// 请求路径：https://4k.tv/cascascsafaffq
+// 资源路径：https://4k.tv/cascascsafaffq/1.ts
+func isPathOrResource(input string) string {
+	parse, err := url.Parse(input)
+	if err != nil {
+		log.Fatalf("解析URL失败: %v", err)
+	}
+	p := parse.Path
+	ext := filepath.Ext(p)
+	if ext != "" && ext != "." {
+		return "resource"
+	}
+	if strings.HasSuffix(p, "/") || ext == "" {
+		return "path"
+	}
+	return "unknown"
 }

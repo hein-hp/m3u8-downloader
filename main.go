@@ -59,13 +59,18 @@ func Parse(body, baseUrl string) M3U8 {
 	}
 	base.Path = path.Dir(base.Path)
 	baseUrlPrefix := base.String()
+	host := base.Host
 
-	frame := ParseFrame(body, baseUrlPrefix)
+	// 解析帧
+	frame := ParseFrame(body, host, baseUrlPrefix)
+
+	// 解析加密信息
 	encrypt := ParseEncrypt(body, baseUrlPrefix)
 	return M3U8{
 		baseUrl:       baseUrl,
 		baseUrlPrefix: baseUrlPrefix,
 		frames:        frame,
 		encrypt:       encrypt,
+		host:          host,
 	}
 }

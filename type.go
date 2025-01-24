@@ -3,6 +3,7 @@ package main
 type M3U8 struct {
 	baseUrl       string
 	baseUrlPrefix string
+	host          string
 	encrypt       Encrypt
 	frames        []Frame
 }
