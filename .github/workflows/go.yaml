@@ -28,6 +28,7 @@ jobs:
       GOOS: ${{ matrix.os }}
       GOARCH: ${{ matrix.arch }}
       FILEEXTENSION: ${{ matrix.file-extension }}
+      GITHUB_TOKEN: ${{ secrets.M3U8_DOWNLOADER_TOKEN }}
     steps:
       - name: Checkout Git repo
         uses: actions/checkout@v4
@@ -53,3 +54,4 @@ jobs:
         with:
           files: |
             ./Releases/*
+          token: ${{ secrets.GITHUB_TOKEN }}
